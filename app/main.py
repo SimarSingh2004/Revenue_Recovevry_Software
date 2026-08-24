@@ -1,18 +1,16 @@
-"""Application entry point and foundational HTTP routes."""
-
 from fastapi import FastAPI
 
+from app.api import recovery_events_router
 from app.core.config import get_settings
 
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name)
+app.include_router(recovery_events_router)
 
 
 @app.get("/health", tags=["runtime"])
 def health_check() -> dict[str, str]:
-    """Report whether the application process is available."""
-
     return {
         "status": "ok",
         "application": settings.app_name,

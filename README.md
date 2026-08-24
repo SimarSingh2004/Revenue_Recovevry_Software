@@ -5,7 +5,7 @@ Minimal runtime foundation for the Razorpay AI Buildathon Revenue Recovery proje
 ## Prerequisites
 
 - Python 3.11 or newer
-- No Docker, database, or external service is required at this stage.
+- Docker Desktop (or Docker Engine with the Compose plugin)
 
 ## Local setup
 
@@ -28,6 +28,37 @@ Copy the example environment file and adjust values if needed:
 Copy-Item .env.example .env
 ```
 
+## PostgreSQL
+
+Start the local PostgreSQL 16 container:
+
+```powershell
+docker compose up -d
+```
+
+Stop the container while preserving its named `postgres_data` volume:
+
+```powershell
+docker compose down
+```
+
+To remove the database data as well, run `docker compose down -v`.
+
+Initialize the database tables and verify the schema:
+
+```powershell
+python -m scripts.verify_database
+```
+
+Current tables: `recovery_events`, `recovery_cases`, `payment_history`,
+`merchant_context`, and `merchant_history`.
+
+Create a recovery event and its initial case:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/recovery-events -ContentType "application/json" -Body '{"event_id":"event_001","event_type":"PAYMENT_FAILED","occurred_at":"2026-08-23T12:00:00Z","payment_id":"payment_001","merchant_id":"merchant_001","customer_id":"customer_001","amount":"125.50","currency":"INR","failure_code":"DECLINED","failure_category":"TEMPORARY_FAILURE","payment_method":"CARD","attempt_number":1}'
+```
+
 ## Run the application
 
 ```powershell
@@ -46,7 +77,15 @@ Invoke-WebRequest http://127.0.0.1:8000/health | Select-Object -ExpandProperty C
 | --- | --- | --- |
 | `APP_NAME` | `Revenue Recovery Strategy Optimizer` | Application name returned by the health check. |
 | `APP_ENVIRONMENT` | `development` | Runtime environment label returned by the health check. |
+| `DATABASE_HOST` | `127.0.0.1` | PostgreSQL host exposed by Docker Compose. |
+| `DATABASE_PORT` | `5432` | PostgreSQL host port exposed by Docker Compose. |
+| `DATABASE_NAME` | `revenue_recovery` | Local PostgreSQL database name. |
+| `DATABASE_USER` | `revenue_recovery` | Local PostgreSQL user. |
+| `DATABASE_PASSWORD` | `local_development_password` | Local PostgreSQL password. |
 
 Configuration is read from process environment variables and, when present, a local `.env` file. `.env` is intentionally not committed.
 
-This stage provides application startup and a health endpoint only. It does not include database setup, data models, recovery-event APIs, ingestion, AI, optimization, policy, provider simulation, reconciliation, audit, or evaluation behavior.
+PostgreSQL currently provides the database foundation and the five persisted
+observable-data tables. No application behavior has been added.
+
+This stage does not include recovery-event APIs, ingestion, AI, optimization, policy, provider simulation, reconciliation, audit, or evaluation behavior.
