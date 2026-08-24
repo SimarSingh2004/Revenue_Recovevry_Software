@@ -41,11 +41,11 @@ def create_recovery_event(
             recovery_case=existing_case,
         )
 
-    recovery_event = RecoveryEvent(**payload.model_dump())
+    recovery_event = RecoveryEvent(**payload.model_dump(),attempt_number=1)
     recovery_case = RecoveryCase(
         case_id=f"case_{uuid4().hex}",
-        event_id=payload.event_id,
-        payment_id=payload.payment_id,
+        event_id=recovery_event.event_id,
+        payment_id=recovery_event.payment_id,
         status="PENDING",
     )
 

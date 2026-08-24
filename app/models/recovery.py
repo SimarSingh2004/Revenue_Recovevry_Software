@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func, CheckConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,8 +19,8 @@ class RecoveryEvent(Base):
     customer_id: Mapped[str] = mapped_column(String, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    failure_code: Mapped[str] = mapped_column(String, nullable=False)
-    failure_category: Mapped[str] = mapped_column(String, nullable=False)
+    failure_code: Mapped[str] = mapped_column(String, nullable=True)
+    failure_category: Mapped[str] = mapped_column(String, nullable=True)
     payment_method: Mapped[str] = mapped_column(String, nullable=False)
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -30,6 +30,11 @@ class RecoveryEvent(Base):
     recovery_case: Mapped["RecoveryCase | None"] = relationship(
         back_populates="recovery_event"
     )
+
+    __table_args__ = (CheckConstraint(
+        "attempt_number >= 1",
+        name="ck_recovery_events_attempt_number_positive",
+    ),)
 
 
 class RecoveryCase(Base):
@@ -59,6 +64,7 @@ class PaymentHistory(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     customer_id: Mapped[str] = mapped_column(String, nullable=False)
+    merchant_id: Mapped[str] = mapped_column(String, nullable=False)
     payment_id: Mapped[str] = mapped_column(String, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)

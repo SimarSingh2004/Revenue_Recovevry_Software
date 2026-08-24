@@ -88,4 +88,24 @@ Configuration is read from process environment variables and, when present, a lo
 PostgreSQL currently provides the database foundation and the five persisted
 observable-data tables. No application behavior has been added.
 
+## Recovery action vocabulary
+
+The initial failed-payment slice has a fixed, application-level vocabulary of
+recovery interventions. Each action has a canonical intervention cost, which
+callers cannot override through the action definition:
+
+| Action | Cost | Basic semantics |
+| --- | ---: | --- |
+| `RETRY_PAYMENT` | 2 | Re-attempt the current failed payment with the same payment method. A future actual payment attempt increments the payment attempt number. |
+| `ALTERNATE_PAYMENT_METHOD` | 3 | Attempt the same outstanding payment with a different available method. A future actual payment attempt increments the payment attempt number. |
+| `SEND_PAYMENT_LINK` | 1 | Generate or send a recovery payment link. Sending it does not increment the attempt number; a later customer payment attempt via the link does. |
+| `ESCALATE` | 5 | Move the same recovery case to a higher-touch/manual path; it is not a payment attempt. |
+| `STOP` | 0 | Deliberately take no recovery intervention for the current case. |
+
+The vocabulary defines only the available interventions, their costs, and their
+payment-attempt semantics. Later AI, optimizer, deterministic policy, and
+simulator components will consume these definitions to predict, select,
+authorize, and execute actions. They—not the vocabulary—will determine
+eligibility, expected recovery, or workflow execution.
+
 This stage does not include recovery-event APIs, ingestion, AI, optimization, policy, provider simulation, reconciliation, audit, or evaluation behavior.

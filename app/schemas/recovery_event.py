@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -13,10 +14,9 @@ class RecoveryEventCreate(BaseModel):
     customer_id: str
     amount: Decimal
     currency: str
-    failure_code: str
-    failure_category: str
+    failure_code: Optional[str] = None
+    failure_category: Optional[str] = None
     payment_method: str
-    attempt_number: int
 
 
 class RecoveryEventResponse(RecoveryEventCreate):
