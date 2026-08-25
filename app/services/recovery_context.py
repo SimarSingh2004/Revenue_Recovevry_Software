@@ -23,7 +23,6 @@ from app.schemas.recovery_context import (
 
 
 def load_recovery_context(db: Session, case_id: str) -> RecoveryContext:
-    """Load the persisted records needed to build one recovery context."""
     recovery_case = db.get(RecoveryCase, case_id)
     if recovery_case is None:
         raise ValueError(f"Recovery case '{case_id}' was not found")
@@ -71,7 +70,6 @@ def build_recovery_context(
     merchant_history: list[MerchantHistory],
     payment_history: list[PaymentHistory],
 ) -> RecoveryContext:
-    """Create a RecoveryContext without writing to any persisted records."""
     relevant_merchant_history = [
         item for item in merchant_history if item.merchant_id == recovery_event.merchant_id
     ]

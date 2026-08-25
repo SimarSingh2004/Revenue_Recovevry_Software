@@ -103,9 +103,36 @@ callers cannot override through the action definition:
 | `STOP` | 0 | Deliberately take no recovery intervention for the current case. |
 
 The vocabulary defines only the available interventions, their costs, and their
-payment-attempt semantics. Later AI, optimizer, deterministic policy, and
-simulator components will consume these definitions to predict, select,
-authorize, and execute actions. They—not the vocabulary—will determine
-eligibility, expected recovery, or workflow execution.
+payment-attempt semantics. Later AI, optimizer, and deterministic policy
+components will consume these definitions to predict, select, authorize, and
+execute actions. They—not the vocabulary—will determine eligibility, expected
+recovery, or workflow execution.
 
-This stage does not include recovery-event APIs, ingestion, AI, optimization, policy, provider simulation, reconciliation, audit, or evaluation behavior.
+## Provider/payment simulator
+
+The provider/payment simulator represents the external environment after an
+action is selected. It returns a structured simulated outcome, samples success
+or failure from a caller-supplied probability, and accepts a seedable random
+source for reproducible tests and demonstrations. It records whether an action
+is a provider execution and whether it is an actual customer payment attempt;
+sending a payment link is not itself a payment attempt.
+
+Ground-truth probability generation remains a separate future evaluation and
+environment concern. The simulator does not choose actions or define a
+probability table.
+
+## Payment attempts and hidden ground truth
+
+`RETRY_PAYMENT`, `ALTERNATE_PAYMENT_METHOD`, and `SEND_PAYMENT_LINK` increment
+the current payment attempt number; `ESCALATE` and `STOP` do not. The hidden
+environment ground-truth function calculates provider-payment success
+probabilities only for the three payment actions, using customer success
+history, payment method, failure category, time since failure, and previous
+recovery attempts, then clamps the result from 0.05 to 0.95.
+
+This probability is an environment input to the simulator and is not a
+model-visible feature. `ESCALATE` and `STOP` have no provider payment success
+probability.
+
+This stage does not include AI, optimization, policy, reconciliation, audit, or
+evaluation behavior.
