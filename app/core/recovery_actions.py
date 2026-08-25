@@ -17,6 +17,14 @@ ACTION_COSTS = {
     RecoveryAction.STOP: 0,
 }
 
+RISK_PENALTIES={
+    RecoveryAction.RETRY_PAYMENT: 1,
+    RecoveryAction.ALTERNATE_PAYMENT_METHOD: 1,
+    RecoveryAction.SEND_PAYMENT_LINK: 0.5,
+    RecoveryAction.ESCALATE: 2,
+    RecoveryAction.STOP: 0,
+}
+
 
 PAYMENT_ATTEMPT_BEHAVIOR = {
     RecoveryAction.RETRY_PAYMENT: "ON_ACTUAL_PAYMENT_ATTEMPT",
@@ -33,3 +41,6 @@ def get_action_cost(action: RecoveryAction | str) -> int:
 
 def get_payment_attempt_behavior(action: RecoveryAction | str) -> str:
     return PAYMENT_ATTEMPT_BEHAVIOR[RecoveryAction(action)]
+
+def get_risk_penalty(action:RecoveryAction | str)-> float:
+    return RISK_PENALTIES[RecoveryAction(action)]

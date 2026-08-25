@@ -8,6 +8,7 @@ BASE_ACTION_PROBABILITIES = {
     RecoveryAction.RETRY_PAYMENT: 0.60,
     RecoveryAction.ALTERNATE_PAYMENT_METHOD: 0.55,
     RecoveryAction.SEND_PAYMENT_LINK: 0.50,
+    RecoveryAction.ESCALATE: 0.15,
 }
 
 PAYMENT_METHOD_EFFECTS = {
@@ -33,6 +34,8 @@ def ground_truth_probability(
     context: RecoveryContext, action: RecoveryAction | str, now: datetime
 ) -> float:
     resolved_action = RecoveryAction(action)
+    if resolved_action == RecoveryAction.STOP:
+        return 0.0
     if resolved_action not in BASE_ACTION_PROBABILITIES:
         raise ValueError(f"{resolved_action.value} has no provider payment probability")
 
@@ -55,6 +58,7 @@ def _clamp_probability(probability: float) -> float:
 
 
 def _customer_history_effect(context: RecoveryContext) -> float:
+    
     history = context.customer_payment_history
     if history.customer_payment_count == 0:
         return 0.0
@@ -80,13 +84,13 @@ def _failure_category_effect(failure_category: str | None) -> float:
 
 
 def _time_since_failure_effect(elapsed: timedelta) -> float:
-    if elapsed < timedelta(hours=1):
+    if elapsed < timedelta(minutes=15):
         return 0.05
-    if elapsed < timedelta(days=1):
+    if elapsed < timedelta(hours=1):
         return 0.03
-    if elapsed < timedelta(days=3):
+    if elapsed < timedelta(hours=6):
         return 0.00
-    if elapsed <= timedelta(days=7):
+    if elapsed <= timedelta(hours=24):
         return -0.04
     return -0.08
 
