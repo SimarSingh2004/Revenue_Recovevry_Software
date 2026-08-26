@@ -1,4 +1,5 @@
 import unittest
+import json
 from unittest.mock import MagicMock
 
 from pydantic import ValidationError
@@ -14,6 +15,7 @@ from app.schemas.recovery_context import (
     CustomerPaymentHistoryContext,
     RecoveryContext,
 )
+from app.schemas.recovery_memory import HistoricalRecoveryInsight
 from app.services.llm_decision import LLMDecisionService
 
 
@@ -207,6 +209,37 @@ class TestLLMDecisionService(unittest.TestCase):
             self.context.current_payment_failure.payment_method,
             contents,
         )
+
+    def test_historical_insights_include_only_safe_fields(self):
+        response = self._mock_gemini_response(
+            action="RETRY_PAYMENT",
+            predicted_p_recovery=0.72,
+            rationale="Retry is appropriate.",
+        )
+        self.client.models.generate_content.return_value = response
+        insight = HistoricalRecoveryInsight(
+            failure_code="INSUFFICIENT_FUNDS",
+            failure_category="HARD_DECLINE",
+            payment_method="CARD",
+            payment_attempt_number=1,
+            action="SEND_PAYMENT_LINK",
+            outcome="FAILED",
+            financial_impact="FEE_LOSS",
+        )
+
+        decision = self.service.decide(self.context, [insight])
+
+        payload = json.loads(
+            self.client.models.generate_content.call_args.kwargs["contents"]
+        )
+        self.assertEqual(decision.action, "RETRY_PAYMENT")
+        self.assertEqual(
+            payload["historical_insights"],
+            [insight.model_dump(mode="json")],
+        )
+        self.assertNotIn("gt_p", payload["historical_insights"][0])
+        self.assertNotIn("baseline_p", payload["historical_insights"][0])
+        self.assertNotIn("net_recovery_value", payload["historical_insights"][0])
 
     def test_unallowed_action_is_rejected(self):
         restricted_context = self.context.model_copy(

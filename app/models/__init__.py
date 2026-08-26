@@ -5,6 +5,7 @@ from app.models.recovery import (
     PaymentHistory,
     RecoveryCase,
     RecoveryEvent,
+    RecoveryLearningMemory,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "PaymentHistory",
     "RecoveryCase",
     "RecoveryEvent",
+    "RecoveryLearningMemory",
 ]

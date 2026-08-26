@@ -101,3 +101,30 @@ class MerchantHistory(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     intervention_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RecoveryLearningMemory(Base):
+    __tablename__ = "recovery_learning_memory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    failure_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    failure_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    payment_method: Mapped[str] = mapped_column(String, nullable=False)
+    payment_attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+    llm_p_pred: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    gt_p: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    baseline_p: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    net_recovery_value: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    financial_impact: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "financial_impact IN ('POSITIVE_RECOVERY', 'FEE_LOSS')",
+            name="ck_recovery_learning_memory_financial_impact",
+        ),
+    )
