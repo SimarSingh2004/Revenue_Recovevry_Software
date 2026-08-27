@@ -11,7 +11,7 @@ from app.schemas.recovery_context import (
     RecoveryCaseContext,
     RecoveryContext,
 )
-from app.simulator.baseline import baseline_probability
+from app.simulator.baseline import _clamp_probability, baseline_probability
 
 
 def make_context() -> RecoveryContext:
@@ -163,40 +163,7 @@ class BaselineProbabilityTests(unittest.TestCase):
 
         self.assertAlmostEqual(probability, 0.70)
 
-    def test_first_payment_attempt_increases_probability(self):
-        self.context.current_payment_failure.payment_attempt_number = 1
-
-        probability = baseline_probability(
-            "RETRY_PAYMENT",
-            self.context,
-            self.now,
-        )
-
-        # 0.70 + 0.05
-        self.assertAlmostEqual(probability, 0.75)
-
-    def test_second_payment_attempt_has_no_adjustment(self):
-        self.context.current_payment_failure.payment_attempt_number = 2
-
-        probability = baseline_probability(
-            "RETRY_PAYMENT",
-            self.context,
-            self.now,
-        )
-
-        self.assertAlmostEqual(probability, 0.70)
-
-    def test_three_or_more_payment_attempts_reduce_probability(self):
-        self.context.current_payment_failure.payment_attempt_number = 3
-
-        probability = baseline_probability(
-            "RETRY_PAYMENT",
-            self.context,
-            self.now,
-        )
-
-        # 0.70 - 0.10
-        self.assertAlmostEqual(probability, 0.60)
+    
 
     def test_recent_failure_increases_probability(self):
         self.context.current_payment_failure.payment_attempt_number = 2
@@ -214,6 +181,7 @@ class BaselineProbabilityTests(unittest.TestCase):
         self.assertAlmostEqual(probability, 0.75)
 
     def test_moderately_recent_failure_has_no_time_adjustment(self):
+        
         self.context.current_payment_failure.payment_attempt_number = 2
         self.context.current_payment_failure.event_occurred_at = (
             self.now - timedelta(minutes=30)
@@ -243,21 +211,7 @@ class BaselineProbabilityTests(unittest.TestCase):
         self.assertAlmostEqual(probability, 0.65)
 
     def test_probability_is_clamped_to_zero(self):
-        self.context.current_payment_failure.payment_attempt_number = 10
-        self.context.current_payment_failure.event_occurred_at = (
-            self.now - timedelta(days=10)
-        )
-        self.context.customer_payment_history.customer_payment_count = 10
-        self.context.customer_payment_history.customer_successful_payment_count = 0
-
-        probability = baseline_probability(
-            "RETRY_PAYMENT",
-            self.context,
-            self.now,
-        )
-
-        self.assertGreaterEqual(probability, 0.0)
-        self.assertEqual(probability, 0.0)
+        self.assertEqual(_clamp_probability(-0.25), 0.0)
 
     def test_strong_positive_adjustments_remain_within_probability_bounds(self):
         self.context.current_payment_failure.payment_attempt_number = 1
@@ -273,8 +227,8 @@ class BaselineProbabilityTests(unittest.TestCase):
             self.now,
         )
 
-        # 0.70 + 0.10 + 0.05 + 0.05 = 0.90
-        self.assertAlmostEqual(probability, 0.90)
+        # 0.70 + 0.10 + 0.05  = 0.85
+        self.assertAlmostEqual(probability, 0.85)
 
     def test_baseline_is_deterministic(self):
         first = baseline_probability(

@@ -127,7 +127,7 @@ def build_recovery_context(
                     intervention_cost=item.intervention_cost,
                     occurred_at=item.occurred_at,
                 )
-                for item in relevant_merchant_history
+                for item in current_case_history
             ],
             recovery_attempt_count=len(current_case_history),
             last_recovery_action=latest_history.action if latest_history else None,

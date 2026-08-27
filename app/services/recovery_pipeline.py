@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models import RecoveryCase
@@ -20,6 +22,7 @@ def run_recovery_pipeline(
     policy_engine: PolicyEngine | None = None,
 ) -> PolicyDecision:
     context = load_recovery_context(db, recovery_case.case_id)
+    now=datetime.now(timezone.utc)
     historical_insights = build_historical_insights(
         retrieve_recovery_memory(db, context)
     )
@@ -30,4 +33,4 @@ def run_recovery_pipeline(
         decision.predicted_p_recovery,
     )
     engine = policy_engine or PolicyEngine()
-    return engine.evaluate(context, decision.action, expected_net_recovery)
+    return engine.evaluate(context, decision.action, expected_net_recovery, now=now)

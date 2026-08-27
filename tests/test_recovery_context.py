@@ -62,7 +62,7 @@ class RecoveryContextTests(unittest.TestCase):
         recent_history = MerchantHistory(
             id=2, merchant_id="merchant_a", case_id="case_current",
             action=RecoveryAction.RETRY_PAYMENT.value,
-            outcome="RECOVERED", amount=Decimal("20.00"), intervention_cost=Decimal("1.00"),
+            outcome="SUCCESS", amount=Decimal("20.00"), intervention_cost=Decimal("1.00"),
             occurred_at=self.now - timedelta(hours=1),
         )
         older_history = MerchantHistory(
@@ -74,7 +74,7 @@ class RecoveryContextTests(unittest.TestCase):
         other_merchant_history = MerchantHistory(
             id=3, merchant_id="merchant_b", case_id="case_other",
             action=RecoveryAction.RETRY_PAYMENT.value,
-            outcome="RECOVERED", amount=Decimal("5.00"), intervention_cost=Decimal("0.20"),
+            outcome="SUCCESS", amount=Decimal("5.00"), intervention_cost=Decimal("0.20"),
             occurred_at=self.now,
         )
 

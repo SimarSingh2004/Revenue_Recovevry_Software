@@ -68,7 +68,7 @@ class PaymentProviderSimulatorTests(unittest.TestCase):
         )
         self.assertEqual(
             simulator.execute("RETRY_PAYMENT", self.context, success_probability=0.0).outcome,
-            SimulationOutcome.FAILURE,
+            SimulationOutcome.FAILED,
         )
 
     def test_seeded_randomness_is_reproducible(self):

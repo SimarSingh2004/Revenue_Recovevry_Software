@@ -8,7 +8,7 @@ from app.schemas.recovery_context import RecoveryContext
 
 class SimulationOutcome(str, Enum):
     SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
+    FAILED = "FAILED"
     NOT_EXECUTED = "NOT_EXECUTED"
 
 
@@ -59,7 +59,7 @@ class PaymentProviderSimulator:
         outcome = (
             SimulationOutcome.SUCCESS
             if self._random.random() < success_probability
-            else SimulationOutcome.FAILURE
+            else SimulationOutcome.FAILED
         )
 
         return SimulationResult(

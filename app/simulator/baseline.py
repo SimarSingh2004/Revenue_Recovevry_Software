@@ -25,7 +25,6 @@ def baseline_probability(
     raw_probability = (
         BASE_ACTION_PROBABILITIES[resolved_action]
         + _customer_history_effect(context)
-        + _payment_attempt_effect(failure.payment_attempt_number)
         + _time_since_failure_effect(now - failure.event_occurred_at)
     )
     return _clamp_probability(raw_probability)
@@ -40,15 +39,6 @@ def _customer_history_effect(context: RecoveryContext) -> float:
         return 0.0
     success_rate = history.customer_successful_payment_count / history.customer_payment_count
     return (success_rate - 0.5) * 0.2  
-
-def _payment_attempt_effect(payment_attempt: int) -> float:
-    if payment_attempt == 1:
-        return 0.05
-    elif payment_attempt == 2:
-        return 0.00
-    else:
-        return -0.10 * (payment_attempt - 2)
-   
 
 def _time_since_failure_effect(time_since_failure: timedelta) -> float:
     minutes_since_failure = time_since_failure.total_seconds() / 60

@@ -61,14 +61,12 @@ def retrieve_recovery_memory(
         for record in records
         if record.failure_code == current.failure_code
         and record.payment_method == current.payment_method
-        and record.payment_attempt_number == current.payment_attempt_number
     ]
     nearby_attempt_matches = [
         record
         for record in records
         if record.failure_code == current.failure_code
         and record.payment_method == current.payment_method
-        and abs(record.payment_attempt_number - current.payment_attempt_number) <= 1
     ]
     category_matches = [
         record
@@ -101,7 +99,6 @@ def build_historical_insights(
             failure_code=record.failure_code,
             failure_category=record.failure_category,
             payment_method=record.payment_method,
-            payment_attempt_number=record.payment_attempt_number,
             action=record.action,
             outcome=record.outcome,
             financial_impact=record.financial_impact,

@@ -17,6 +17,7 @@ from app.schemas.recovery_context import (
 class TestPolicyEngine(unittest.TestCase):
 
     def setUp(self):
+        
         self.engine = PolicyEngine()
 
         self.context = RecoveryContext(
@@ -139,8 +140,9 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertEqual(result.action, RecoveryAction.ESCALATE.value)
 
     def test_reject_when_cooldown_is_active(self):
+        now = datetime.now(timezone.utc)
         self.context.merchant_recovery_history.last_recovery_at = (
-            datetime.now(timezone.utc) - timedelta(seconds=30)
+            now - timedelta(seconds=30)
         )
         self.context.merchant_recovery_history.last_recovery_action = None
 
@@ -148,19 +150,22 @@ class TestPolicyEngine(unittest.TestCase):
             context=self.context,
             action=RecoveryAction.RETRY_PAYMENT.value,
             expected_net_recovery=100.0,
+            now=now,
         )
 
         self.assertFalse(result.approved)
 
     def test_allow_when_cooldown_is_satisfied(self):
+        now = datetime.now(timezone.utc)
         self.context.merchant_recovery_history.last_recovery_at = (
-            datetime.now(timezone.utc) - timedelta(seconds=120)
+            now - timedelta(seconds=120)
         )
 
         result = self.engine.evaluate(
             context=self.context,
             action=RecoveryAction.RETRY_PAYMENT.value,
             expected_net_recovery=100.0,
+            now=now,
         )
 
         self.assertTrue(result.approved)
@@ -210,7 +215,7 @@ class TestPolicyEngine(unittest.TestCase):
         )
 
         self.assertFalse(result.approved)
-        self.assertEqual(result.expected_net_recovery, -50.0)
+        self.assertEqual(result.expected_net_recovery, 0.0)
 
 
 if __name__ == "__main__":

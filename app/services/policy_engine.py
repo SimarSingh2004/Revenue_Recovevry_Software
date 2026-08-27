@@ -11,6 +11,7 @@ class PolicyEngine:
         context: RecoveryContext,
         action: str,
         expected_net_recovery: float = 0,
+        now: datetime | None = None,
     ) -> PolicyDecision:
         reasons: list[str] = []
 
@@ -20,7 +21,7 @@ class PolicyEngine:
             return PolicyDecision(
                 approved=False,
                 action=action,
-                expected_net_recovery=expected_net_recovery,
+                expected_net_recovery=max(0.0, expected_net_recovery),
                 reasons=[f"Invalid action: {action}"],
             )
 
@@ -28,20 +29,15 @@ class PolicyEngine:
             return PolicyDecision(
                 approved=False,
                 action=action,
-                expected_net_recovery=expected_net_recovery,
+                expected_net_recovery=max(0.0, expected_net_recovery),
                 reasons=["Recovery is disabled for this merchant."],
             )
 
-        allowed_actions = {
-            RecoveryAction(allowed_action).value
-            for allowed_action in context.merchant.allowed_recovery_actions
-            if allowed_action in RecoveryAction._value2member_map_
-        }
-        if resolved_action.value not in allowed_actions:
+        if action not in context.merchant.allowed_recovery_actions:
             return PolicyDecision(
                 approved=False,
                 action=action,
-                expected_net_recovery=expected_net_recovery,
+                expected_net_recovery=max(0.0, expected_net_recovery),
                 reasons=[f"Action '{action}' is not allowed for this merchant."],
             )
 
@@ -56,7 +52,7 @@ class PolicyEngine:
             return PolicyDecision(
                 approved=False,
                 action=action,
-                expected_net_recovery=expected_net_recovery,
+                expected_net_recovery=max(0.0, expected_net_recovery),
                 reasons=[
                     f"Maximum recovery attempts ({context.merchant.max_recovery_attempts}) reached."
                 ],
@@ -71,7 +67,7 @@ class PolicyEngine:
             }
             and history.last_recovery_at is not None
         ):
-            now = datetime.now(timezone.utc)
+            now = now or datetime.now(timezone.utc)
             last_recovery_at = history.last_recovery_at
 
             if last_recovery_at.tzinfo is None:
@@ -83,7 +79,7 @@ class PolicyEngine:
                 return PolicyDecision(
                     approved=False,
                     action=action,
-                    expected_net_recovery=expected_net_recovery,
+                    expected_net_recovery=max(0.0, expected_net_recovery),
                     reasons=["Cooldown period is still active."],
                 )
 
@@ -91,15 +87,15 @@ class PolicyEngine:
             return PolicyDecision(
                 approved=False,
                 action=action,
-                expected_net_recovery=expected_net_recovery,
-                reasons=[f"Action '{action}' was already attempted in the last attempt."],
+                expected_net_recovery=max(0.0, expected_net_recovery),
+                reasons=[f"Action '{action}' was already attempted."],
             )
 
         if expected_net_recovery <= 0:
             return PolicyDecision(
                 approved=False,
                 action=action,
-                expected_net_recovery=expected_net_recovery,
+                expected_net_recovery=0.0,
                 reasons=["Expected net recovery must be positive."],
             )
 

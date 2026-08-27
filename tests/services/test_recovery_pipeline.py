@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-
+from datetime import datetime, timezone
 from app.models import RecoveryCase
 from app.schemas.llm_decision import LLMDecision
 from app.schemas.policy_decision import PolicyDecision
@@ -51,7 +51,7 @@ class RecoveryPipelineTests(unittest.TestCase):
             self.llm_decision_service,
             policy_engine,
         )
-
+        now=datetime.now(timezone.utc)
         mock_load_context.assert_called_once_with(self.db, "case_001")
         mock_retrieve_memory.assert_called_once_with(self.db, self.context)
         mock_build_insights.assert_called_once_with([])
@@ -65,6 +65,7 @@ class RecoveryPipelineTests(unittest.TestCase):
             self.context,
             "RETRY_PAYMENT",
             42.0,
+            now=now
         )
         self.assertIs(result, self.policy_decision)
 

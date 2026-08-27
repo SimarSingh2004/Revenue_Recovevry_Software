@@ -65,7 +65,7 @@ class TestLLMDecisionService(unittest.TestCase):
                 history=[
                     MerchantRecoveryHistoryItem(
                         action="RETRY_PAYMENT",
-                        outcome="FAILURE",
+                        outcome="FAILED",
                         amount="100.00",
                         intervention_cost="1.00",
                         occurred_at="2026-08-26T09:00:00Z",
@@ -73,7 +73,7 @@ class TestLLMDecisionService(unittest.TestCase):
                 ],
                 recovery_attempt_count=1,
                 last_recovery_action="RETRY_PAYMENT",
-                last_recovery_outcome="FAILURE",
+                last_recovery_outcome="FAILED",
                 last_recovery_at="2026-08-26T09:00:00Z",
             ),
             customer_payment_history=CustomerPaymentHistoryContext(

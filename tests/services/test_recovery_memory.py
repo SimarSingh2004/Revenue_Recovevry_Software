@@ -120,24 +120,6 @@ class RecoveryMemoryTests(unittest.TestCase):
         self.assertIn("FAILED", [record.outcome for record in selected])
         self.assertEqual(len({record.action for record in selected}), len(selected))
 
-    def test_attempt_fallback_and_category_fallback_are_used_only_when_needed(self):
-        attempt_fallback = self.memory(
-            1, "RETRY_PAYMENT", "SUCCESS", payment_attempt_number=3
-        )
-        category_fallback = self.memory(
-            2, "SEND_PAYMENT_LINK", "FAILED", failure_code="OTHER",
-            payment_method="UPI", payment_attempt_number=9,
-        )
-        unrelated = self.memory(
-            3, "ESCALATE", "FAILED", failure_code="OTHER",
-            failure_category="OTHER_CATEGORY", payment_method="UPI",
-            payment_attempt_number=9,
-        )
-
-        selected = self.retrieve([attempt_fallback, category_fallback, unrelated])
-
-        self.assertEqual(selected, [attempt_fallback, category_fallback])
-
     def test_retrieval_is_limited_to_three_records(self):
         records = [
             self.memory(1, "RETRY_PAYMENT", "SUCCESS"),
@@ -158,7 +140,7 @@ class RecoveryMemoryTests(unittest.TestCase):
             set(insights[0].model_dump()),
             {
                 "failure_code", "failure_category", "payment_method",
-                "payment_attempt_number", "action", "outcome",
+            "action", "outcome",
                 "financial_impact",
             },
         )
