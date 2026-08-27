@@ -73,8 +73,11 @@ def build_recovery_context(
     relevant_merchant_history = [
         item for item in merchant_history if item.merchant_id == recovery_event.merchant_id
     ]
+    current_case_history = [
+        item for item in relevant_merchant_history if item.case_id == recovery_case.case_id
+    ]
     latest_history = max(
-        relevant_merchant_history, key=lambda item: (item.occurred_at, item.id), default=None
+        current_case_history, key=lambda item: (item.occurred_at, item.id), default=None
     )
     historical_payments = [
         item
@@ -126,7 +129,7 @@ def build_recovery_context(
                 )
                 for item in relevant_merchant_history
             ],
-            recovery_attempt_count=len(relevant_merchant_history),
+            recovery_attempt_count=len(current_case_history),
             last_recovery_action=latest_history.action if latest_history else None,
             last_recovery_outcome=latest_history.outcome if latest_history else None,
             last_recovery_at=latest_history.occurred_at if latest_history else None,

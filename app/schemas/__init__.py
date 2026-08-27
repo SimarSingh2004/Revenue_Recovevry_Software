@@ -6,6 +6,7 @@ from app.schemas.recovery_event import (
     ValidationErrorResponse,
 )
 from app.schemas.recovery_context import RecoveryContext
+from app.schemas.policy_decision import PolicyDecision
 
 __all__ = [
     "RecoveryCaseResponse",
@@ -14,4 +15,5 @@ __all__ = [
     "RecoveryEventResponse",
     "RecoveryContext",
     "ValidationErrorResponse",
+    "PolicyDecision",
 ]

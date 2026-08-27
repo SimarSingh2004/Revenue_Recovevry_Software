@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+from app.core.recovery_actions import RecoveryAction
 from app.models import MerchantContext, MerchantHistory, PaymentHistory, RecoveryCase, RecoveryEvent
 from app.services.recovery_context import build_recovery_context, load_recovery_context
 
@@ -44,7 +45,9 @@ class RecoveryContextTests(unittest.TestCase):
             status="PENDING", created_at=self.now,
         )
         self.merchant = MerchantContext(
-            merchant_id="merchant_a", recovery_enabled=True, allowed_recovery_actions=["RETRY"],
+            merchant_id="merchant_a",
+            recovery_enabled=True,
+            allowed_recovery_actions=[RecoveryAction.RETRY_PAYMENT.value],
             merchant_segment="SMB", retry_cooldown_seconds=60, max_recovery_attempts=3,
         )
 
@@ -57,17 +60,20 @@ class RecoveryContextTests(unittest.TestCase):
 
     def test_builds_all_context_categories_from_filtered_history(self):
         recent_history = MerchantHistory(
-            id=2, merchant_id="merchant_a", case_id="case_old", action="RETRY",
+            id=2, merchant_id="merchant_a", case_id="case_current",
+            action=RecoveryAction.RETRY_PAYMENT.value,
             outcome="RECOVERED", amount=Decimal("20.00"), intervention_cost=Decimal("1.00"),
             occurred_at=self.now - timedelta(hours=1),
         )
         older_history = MerchantHistory(
-            id=1, merchant_id="merchant_a", case_id="case_older", action="EMAIL",
+            id=1, merchant_id="merchant_a", case_id="case_older",
+            action=RecoveryAction.SEND_PAYMENT_LINK.value,
             outcome="FAILED", amount=Decimal("10.00"), intervention_cost=Decimal("0.50"),
             occurred_at=self.now - timedelta(days=1),
         )
         other_merchant_history = MerchantHistory(
-            id=3, merchant_id="merchant_b", case_id="case_other", action="RETRY",
+            id=3, merchant_id="merchant_b", case_id="case_other",
+            action=RecoveryAction.RETRY_PAYMENT.value,
             outcome="RECOVERED", amount=Decimal("5.00"), intervention_cost=Decimal("0.20"),
             occurred_at=self.now,
         )
@@ -87,8 +93,11 @@ class RecoveryContextTests(unittest.TestCase):
         self.assertEqual(context.case.case_id, "case_current")
         self.assertEqual(context.current_payment_failure.payment_attempt_number, 1)
         self.assertEqual(context.merchant.merchant_id, "merchant_a")
-        self.assertEqual(context.merchant_recovery_history.recovery_attempt_count, 2)
-        self.assertEqual(context.merchant_recovery_history.last_recovery_action, "RETRY")
+        self.assertEqual(context.merchant_recovery_history.recovery_attempt_count, 1)
+        self.assertEqual(
+            context.merchant_recovery_history.last_recovery_action,
+            RecoveryAction.RETRY_PAYMENT.value,
+        )
         self.assertEqual(context.customer_payment_history.customer_payment_count, 2)
         self.assertEqual(context.customer_payment_history.customer_failed_payment_count, 1)
         self.assertEqual(context.customer_payment_history.customer_successful_payment_count, 1)
