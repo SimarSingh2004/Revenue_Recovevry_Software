@@ -15,8 +15,10 @@ from app.services.recovery_memory import (
 )
 from app.simulator.payment_provider import (
     PaymentProviderSimulator,
+    SimulationOutcome,
     SimulationResult
 )
+from app.simulator.ground_truth import ground_truth_probability
 from app.core.recovery_actions import get_action_cost
 
 
@@ -26,21 +28,46 @@ def run_recovery_pipeline(
     llm_decision_service: LLMDecisionService,
     policy_engine: PolicyEngine | None = None,
     payment_provider: PaymentProviderSimulator | None = None,
-    success_probability: float | None = None,
 ) -> tuple[PolicyDecision, SimulationResult | None]:
     context = load_recovery_context(db, recovery_case.case_id)
     now=datetime.now(timezone.utc)
     historical_insights = build_historical_insights(
         retrieve_recovery_memory(db, context)
     )
-    decision: LLMDecision = llm_decision_service.decide(context, historical_insights)
-    expected_net_recovery = expected_net_recovery_value(
-        context,
-        decision.action,
-        decision.predicted_p_recovery,
-    )
     engine = policy_engine or PolicyEngine()
-    policy_decision=engine.evaluate(context, decision.action, expected_net_recovery, now=now)
+
+    policy_feedback=[]
+    rejected_actions=set()
+    max_policy_retries=2
+
+    for _ in range(max_policy_retries+1):
+        decision: LLMDecision = llm_decision_service.decide(context, historical_insights,policy_feedback=policy_feedback)
+        if decision.action in rejected_actions:
+            policy_feedback.append({
+                "action": decision.action,
+                "reasons": ["Action previously rejected by policy layer."],
+            })
+
+        expected_net_recovery = expected_net_recovery_value(
+            context,
+            decision.action,
+            decision.predicted_p_recovery,
+        )
+   
+        policy_decision=engine.evaluate(context, decision.action, expected_net_recovery, now=now)
+
+        if policy_decision.approved:
+            break
+
+        rejected_actions.add(decision.action)
+
+        policy_feedback.append({
+            "action": decision.action,
+            "reasons": policy_decision.reasons,
+        })
+    else:
+        return policy_decision, None
+
 
     if not policy_decision.approved:
         return policy_decision, None
@@ -48,8 +75,7 @@ def run_recovery_pipeline(
     if payment_provider is None:
         raise ValueError("PaymentProviderSimulator is required when policy approves an action.")
 
-    if success_probability is None:
-        raise ValueError("success_probability is required when policy approves an action.")
+    success_probability = ground_truth_probability(context,policy_decision.action,now=now)
 
     simulation_result=payment_provider.execute(
         policy_decision.action,
@@ -72,3 +98,36 @@ def run_recovery_pipeline(
     db.commit()
 
     return policy_decision, simulation_result
+
+def run_recovery_until_resolved(
+        db:Session,
+        recovery_case:RecoveryCase,
+        llm_decision_service:LLMDecisionService,
+        policy_engine:PolicyEngine | None = None,
+        payment_provider:PaymentProviderSimulator | None = None,
+)-> tuple[PolicyDecision]:
+    while True:
+        policy_decision, simulation_result = run_recovery_pipeline(
+            db,
+            recovery_case,
+            llm_decision_service,
+            policy_engine=policy_engine,
+            payment_provider=payment_provider,
+        )
+
+        if simulation_result is None:
+            return policy_decision, None
+
+        if simulation_result.outcome == SimulationOutcome.SUCCESS:
+            recovery_case.status = "RECOVERED"
+            db.commit()
+            return policy_decision, simulation_result
+
+        if not simulation_result.is_provider_execution:
+            recovery_case.status = (
+                "STOPPED"
+                if simulation_result.action.value == "STOP"
+                else "ESCALATED"
+            )
+            db.commit()
+            return policy_decision, simulation_result

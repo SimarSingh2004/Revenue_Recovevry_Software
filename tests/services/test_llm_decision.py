@@ -227,7 +227,7 @@ class TestLLMDecisionService(unittest.TestCase):
             financial_impact="FEE_LOSS",
         )
 
-        decision = self.service.decide(self.context, [insight])
+        decision = self.service.decide(self.context, [insight],policy_feedback=[])
 
         payload = json.loads(
             self.client.models.generate_content.call_args.kwargs["contents"]
@@ -382,6 +382,30 @@ class TestLLMDecisionService(unittest.TestCase):
             self.service.decide(empty_context)
 
         self.client.models.generate_content.assert_not_called()
+
+    def test_policy_feedback_is_sent_to_gemini(self):
+        response=MagicMock()
+        response.text="""{
+            "action": "SEND_PAYMENT_LINK",
+            "predicted_p_recovery": 0.65,
+            "rationale": "The lower-cost payment link is preferable after the retry was rejected."
+        }"""
+
+        self.client.models.generate_content.return_value=response
+
+        policy_feedback=[{
+            
+            "action": "RETRY_PAYMENT",
+            "reasons": ["Expected net recovery must be positive"]
+        }]
+
+        self.service.decide(self.context,policy_feedback=policy_feedback)
+
+        call=self.client.models.generate_content.call_args
+        payload=json.loads(call.kwargs["contents"])
+
+        self.assertEqual(payload["policy_feedback"],policy_feedback)
+
 
 
 if __name__ == "__main__":
