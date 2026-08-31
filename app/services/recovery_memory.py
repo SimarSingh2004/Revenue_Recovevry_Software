@@ -1,11 +1,20 @@
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session 
 
+from app.core.recovery_actions import get_action_cost
 from app.models import RecoveryLearningMemory
+from app.schemas.llm_decision import LLMDecision
 from app.schemas.recovery_context import RecoveryContext
 from app.schemas.recovery_memory import HistoricalRecoveryInsight
+from app.simulator.baseline import baseline_probability
+from app.simulator.payment_provider import SimulationOutcome, SimulationResult
+import logging
+
+
+logger=logging.getLogger(__name__)
 
 
 def store_recovery_memory(
@@ -62,12 +71,6 @@ def retrieve_recovery_memory(
         if record.failure_code == current.failure_code
         and record.payment_method == current.payment_method
     ]
-    nearby_attempt_matches = [
-        record
-        for record in records
-        if record.failure_code == current.failure_code
-        and record.payment_method == current.payment_method
-    ]
     category_matches = [
         record
         for record in records
@@ -78,7 +81,7 @@ def retrieve_recovery_memory(
     selected_ids: set[int] = set()
     selected_actions: set[str] = set()
 
-    for matches in (exact_matches, nearby_attempt_matches, category_matches):
+    for matches in (exact_matches, category_matches):
         if len(selected) == 3:
             break
         _select_diverse_records(
@@ -86,6 +89,21 @@ def retrieve_recovery_memory(
             selected,
             selected_ids,
             selected_actions,
+        )
+
+    logger.info(
+        "[RecoveryMemory] Retrieved %d historical record(s)",
+        len(selected),
+    )
+
+    for record in selected:
+        logger.info(
+            "[RecoveryMemory] %s / %s / %s / action=%s / outcome=%s",
+            record.failure_code,
+            record.failure_category,
+            record.payment_method,
+            record.action,
+            record.outcome,
         )
 
     return selected
@@ -151,3 +169,49 @@ def _add_records(
         selected.append(record)
         selected_ids.add(record.id)
         selected_actions.add(record.action)
+
+
+def record_recovery_memory(
+        db:Session,
+        *,
+        context:RecoveryContext,
+        decision:LLMDecision,
+        simulation_result:SimulationResult,
+        gt_p:float,
+        now:datetime
+)->RecoveryLearningMemory:
+
+    if not simulation_result.is_provider_execution:
+        raise ValueError("SimulationResult must be from provider execution.")
+
+    failure=context.current_payment_failure
+    action=simulation_result.action
+    intervention_cost=get_action_cost(action)
+    amount=failure.amount
+    baseline_p=baseline_probability(action,context,now)
+
+    if simulation_result.outcome==SimulationOutcome.SUCCESS:
+        net_recovery_value=amount-intervention_cost
+        financial_impact="POSITIVE_RECOVERY"
+
+    elif simulation_result.outcome==SimulationOutcome.FAILED:
+        net_recovery_value=-intervention_cost
+        financial_impact="FEE_LOSS"
+
+    else:
+        raise ValueError(f"Unexpected SimulationOutcome: {simulation_result.outcome}")
+
+    return store_recovery_memory(
+        db,
+        failure_code=failure.failure_code,
+        failure_category=failure.failure_category,
+        payment_method=failure.payment_method,
+        payment_attempt_number=failure.payment_attempt_number,
+        action=action.value,
+        outcome=simulation_result.outcome.value,
+        llm_p_pred=Decimal(str(decision.predicted_p_recovery)),
+        gt_p=Decimal(str(gt_p)),
+        baseline_p=Decimal(str(baseline_p)),
+        net_recovery_value=net_recovery_value,
+        financial_impact=financial_impact,
+    )

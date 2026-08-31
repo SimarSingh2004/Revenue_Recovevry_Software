@@ -11,6 +11,7 @@ from app.services.policy_engine import PolicyEngine
 from app.services.recovery_context import load_recovery_context
 from app.services.recovery_memory import (
     build_historical_insights,
+    record_recovery_memory,
     retrieve_recovery_memory,
 )
 from app.simulator.payment_provider import (
@@ -20,6 +21,9 @@ from app.simulator.payment_provider import (
 )
 from app.simulator.ground_truth import ground_truth_probability
 from app.core.recovery_actions import get_action_cost
+import logging
+
+logger=logging.getLogger(__name__)
 
 
 def run_recovery_pipeline(
@@ -34,6 +38,11 @@ def run_recovery_pipeline(
     historical_insights = build_historical_insights(
         retrieve_recovery_memory(db, context)
     )
+    logger.info(
+        "[RecoveryPipeline] Historical insights supplied to LLM: %d",
+        len(historical_insights),
+    )
+
     engine = policy_engine or PolicyEngine()
 
     policy_feedback=[]
@@ -81,6 +90,15 @@ def run_recovery_pipeline(
         policy_decision.action,
         context,
         success_probability=success_probability,
+    )
+
+    record_recovery_memory(
+        db,
+        context=context,
+        decision=decision,
+        simulation_result=simulation_result,
+        gt_p=success_probability,
+        now=now
     )
 
     db.add(

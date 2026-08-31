@@ -1,4 +1,6 @@
 import unittest
+from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 from unittest.mock import ANY, MagicMock, patch
 from app.core.recovery_actions import RecoveryAction
 from app.models import RecoveryCase
@@ -32,6 +34,13 @@ class RecoveryPipelineTests(unittest.TestCase):
         self.context.merchant.merchant_id = "merchant_001"
         self.context.case.case_id = "case_001"
         self.context.current_payment_failure.amount = 1250
+        self.context.current_payment_failure.failure_code = "CARD_DECLINED"
+        self.context.current_payment_failure.failure_category = "TEMPORARY_FAILURE"
+        self.context.current_payment_failure.payment_method = "CARD"
+        self.context.current_payment_failure.payment_attempt_number = 1
+        self.context.current_payment_failure.event_occurred_at = (
+            datetime.now(timezone.utc) - timedelta(minutes=5)
+        )
 
         self.decision = LLMDecision(
             action="RETRY_PAYMENT",
@@ -55,6 +64,20 @@ class RecoveryPipelineTests(unittest.TestCase):
         )
         self.payment_provider = MagicMock(spec=PaymentProviderSimulator)
         self.payment_provider.execute.return_value = self.simulation_result
+
+        self.baseline_probability_patcher = patch(
+            "app.services.recovery_memory.baseline_probability",
+            return_value=0.55,
+        )
+        self.mock_baseline_probability = self.baseline_probability_patcher.start()
+        self.addCleanup(self.baseline_probability_patcher.stop)
+
+        self.action_cost_patcher = patch(
+            "app.services.recovery_memory.get_action_cost",
+            return_value=1.5,
+        )
+        self.mock_memory_action_cost = self.action_cost_patcher.start()
+        self.addCleanup(self.action_cost_patcher.stop)
 
     def test_loads_context_and_returns_policy_decision(
         self,
@@ -140,10 +163,44 @@ class RecoveryPipelineTests(unittest.TestCase):
         mock_ground_truth_probability.assert_called_once_with(self.context, RecoveryAction.RETRY_PAYMENT,now=ANY)
 
         self.payment_provider.execute.assert_called_once_with("RETRY_PAYMENT", self.context, success_probability=0.60)
-        self.db.add.assert_called_once()
-        self.db.commit.assert_called_once()
+        self.assertEqual(self.db.add.call_count, 2)
+        self.assertEqual(self.db.commit.call_count, 2)
 
-        history_record = self.db.add.call_args.args[0]
+        added_records = [
+            call.args[0]
+            for call in self.db.add.call_args_list
+        ]
+
+        learning_memory = next(
+            record
+            for record in added_records
+            if record.__class__.__name__ == "RecoveryLearningMemory"
+        )
+
+        history_record = next(
+            record
+            for record in added_records
+            if record.__class__.__name__ == "MerchantHistory"
+        )
+
+        self.assertEqual(learning_memory.failure_code, "CARD_DECLINED")
+        self.assertEqual(learning_memory.failure_category, "TEMPORARY_FAILURE")
+        self.assertEqual(learning_memory.payment_method, "CARD")
+        self.assertEqual(learning_memory.action, "RETRY_PAYMENT")
+        self.assertEqual(learning_memory.outcome, "SUCCESS")
+        self.assertEqual(learning_memory.llm_p_pred, Decimal("0.72"))
+        self.assertEqual(learning_memory.gt_p, Decimal("0.60"))
+        self.assertEqual(learning_memory.baseline_p, Decimal(str(
+            self.mock_baseline_probability.return_value
+        )))
+        self.assertEqual(
+            learning_memory.net_recovery_value,
+            Decimal("1248.5"),
+        )
+        self.assertEqual(
+            learning_memory.financial_impact,
+            "POSITIVE_RECOVERY",
+        )
         self.assertEqual(history_record.merchant_id, "merchant_001")
         self.assertEqual(history_record.case_id, "case_001")
         self.assertEqual(history_record.action, "RETRY_PAYMENT")
