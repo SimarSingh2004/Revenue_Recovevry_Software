@@ -62,40 +62,46 @@ class LLMDecisionService:
             "policy_feedback":policy_feedback or [],
         }
 
-        response=self._client.models.generate_content(
-            model=self._model,
-            contents=json.dumps(payload,indent=2),
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                temperature=0.0,
-                response_mime_type="application/json",
-                response_schema={
-                    "type": "OBJECT",
-                    "properties": {
-                        "action": {"type": "STRING"},
-                        "predicted_p_recovery": {
-                            "type": "NUMBER",
-                            "minimum": 0.0,
-                            "maximum": 1.0,
-                        },
-                        "rationale": {"type": "STRING"},
-                    },
-                    "required": [
-                        "action",
-                        "predicted_p_recovery",
-                        "rationale",
-                    ],
-                }
-            )
-        )
-
+        try:
+            response=self._client.models.generate_content(
+                        model=self._model,
+                        contents=json.dumps(payload,indent=2),
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            temperature=0.0,
+                            response_mime_type="application/json",
+                            response_schema={
+                                "type": "OBJECT",
+                                "properties": {
+                                    "action": {"type": "STRING"},
+                                    "predicted_p_recovery": {
+                                        "type": "NUMBER",
+                                        "minimum": 0.0,
+                                        "maximum": 1.0,
+                                    },
+                                    "rationale": {"type": "STRING"},
+                                },
+                                "required": [
+                                    "action",
+                                    "predicted_p_recovery",
+                                    "rationale",
+                                ],
+                            }
+                        )
+                    )
+        except Exception as exe:
+            raise RuntimeError(f"Error during LLM decision-making: {exe}") from exe
+            
+        if not response.text:
+            raise ValueError("LLM returned no response.")
+            
         decision=LLMDecision.model_validate_json(response.text)
-
+            
         if decision.action not in allowed_actions:
             raise ValueError(f"LLM returned an action '{decision.action}' that is not in the allowed recovery actions")
-
+            
         return decision
-
+        
 def get_llm_decision_service(settings:Settings | None = None)->LLMDecisionService:
     resolved_settings=settings or get_settings()
     return LLMDecisionService(client=genai.Client(api_key=resolved_settings.gemini_api_key),model=resolved_settings.gemini_model)

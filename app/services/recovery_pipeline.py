@@ -50,7 +50,13 @@ def run_recovery_pipeline(
     max_policy_retries=2
 
     for _ in range(max_policy_retries+1):
-        decision: LLMDecision = llm_decision_service.decide(context, historical_insights,policy_feedback=policy_feedback)
+        try:
+            decision: LLMDecision = llm_decision_service.decide(
+                context, historical_insights, policy_feedback=policy_feedback
+            )
+        except RuntimeError:
+            db.rollback()
+            raise 
         if decision.action in rejected_actions:
             policy_feedback.append({
                 "action": decision.action,
@@ -123,7 +129,7 @@ def run_recovery_until_resolved(
         llm_decision_service:LLMDecisionService,
         policy_engine:PolicyEngine | None = None,
         payment_provider:PaymentProviderSimulator | None = None,
-)-> tuple[PolicyDecision]:
+)-> tuple[PolicyDecision, SimulationResult | None]:
     while True:
         policy_decision, simulation_result = run_recovery_pipeline(
             db,

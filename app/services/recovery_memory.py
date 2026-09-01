@@ -1,10 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
+from operator import and_
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session 
 
-from app.core.recovery_actions import get_action_cost
+from app.core.recovery_actions import RecoveryAction, get_action_cost
 from app.models import RecoveryLearningMemory
 from app.schemas.llm_decision import LLMDecision
 from app.schemas.recovery_context import RecoveryContext
@@ -46,8 +47,6 @@ def store_recovery_memory(
         financial_impact=financial_impact,
     )
     db.add(memory)
-    db.commit()
-    db.refresh(memory)
     return memory
 
 
@@ -58,10 +57,16 @@ def retrieve_recovery_memory(
     current = context.current_payment_failure
     records = list(
         db.scalars(
-            select(RecoveryLearningMemory).order_by(
-                RecoveryLearningMemory.created_at.desc(),
-                RecoveryLearningMemory.id.desc(),
-            )
+            select(RecoveryLearningMemory).where(
+                or_(
+                    and_(
+                        RecoveryLearningMemory.failure_code==current.failure_code,
+                        RecoveryLearningMemory.payment_method==current.payment_method,
+                    ),
+                    RecoveryLearningMemory.failure_category==current.failure_category,
+                )
+            ).order_by(RecoveryLearningMemory.created_at.desc(),
+                       RecoveryLearningMemory.id.desc())
         )
     )
 
@@ -181,11 +186,32 @@ def record_recovery_memory(
         now:datetime
 )->RecoveryLearningMemory:
 
-    if not simulation_result.is_provider_execution:
-        raise ValueError("SimulationResult must be from provider execution.")
-
     failure=context.current_payment_failure
     action=simulation_result.action
+    if not simulation_result.is_provider_execution:
+        if action == RecoveryAction.STOP:
+            outcome = "STOPPED"
+        elif action == RecoveryAction.ESCALATE:
+            outcome = "ESCALATED"
+        else:
+            raise ValueError(
+                "Non-provider execution result must be STOP or ESCALATE."
+            )
+
+        return store_recovery_memory(
+            db,
+            failure_code=failure.failure_code,
+            failure_category=failure.failure_category,
+            payment_method=failure.payment_method,
+            payment_attempt_number=failure.payment_attempt_number,
+            action=action.value,
+            outcome=outcome,
+            llm_p_pred=Decimal(str(decision.predicted_p_recovery)),
+            gt_p=Decimal("0"),
+            baseline_p=Decimal("0"),
+            net_recovery_value=Decimal("0"),
+            financial_impact="NO_RECOVERY_ATTEMPT",
+        )
     intervention_cost=get_action_cost(action)
     amount=failure.amount
     baseline_p=baseline_probability(action,context,now)

@@ -100,8 +100,6 @@ class RecoveryMemoryTests(unittest.TestCase):
         )
 
         db.add.assert_called_once_with(memory)
-        db.commit.assert_called_once_with()
-        db.refresh.assert_called_once_with(memory)
         self.assertEqual(memory.action, "RETRY_PAYMENT")
         self.assertEqual(memory.gt_p, Decimal("0.50"))
 

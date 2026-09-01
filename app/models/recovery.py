@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func, CheckConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, String, func, CheckConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -73,6 +73,15 @@ class PaymentHistory(Base):
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    __table_args__=(
+        Index(
+            "ix_payment_history_customer_merchant_occurred",
+            "customer_id",
+            "merchant_id",
+            "occurred_at",
+        ),
+    )
+
 
 class MerchantContext(Base):
     __tablename__ = "merchant_context"
@@ -102,6 +111,15 @@ class MerchantHistory(Base):
     intervention_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    __table_args__=(
+        Index(
+            "ix_merchant_history_merchant_case_occurred",
+            "merchant_id",
+            "case_id",
+            "occurred_at",
+        ),
+    )
+
 
 class RecoveryLearningMemory(Base):
     __tablename__ = "recovery_learning_memory"
@@ -126,5 +144,14 @@ class RecoveryLearningMemory(Base):
         CheckConstraint(
             "financial_impact IN ('POSITIVE_RECOVERY', 'FEE_LOSS')",
             name="ck_recovery_learning_memory_financial_impact",
+        ),
+        Index(
+            "ix_recovery_memory_failure_code_payment_method",
+            "failure_code",
+            "payment_method",
+        ),
+        Index(
+            "ix_recovery_memory_failure_category",
+            "failure_category",
         ),
     )

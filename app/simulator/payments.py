@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from random import Random
+from random import Random, random
 
 class PaymentOutcome(str,Enum):
     SUCCESS = "SUCCESS"
@@ -23,5 +23,18 @@ class PaymentSimulator:
             payment_id=payment_id,
             outcome=outcome,
         )
+
+class FailureCategory(str,Enum):
+        TEMPORARY_FAILURE: str = "TEMPORARY_FAILURE"
+        INSUFFICIENT_FUNDS: str = "INSUFFICIENT_FUNDS"
+        NETWORK_ERROR: str = "NETWORK_ERROR"
+        PROCESSING_ERROR: str = "PROCESSING_ERROR"
+        EXPIRED_CARD: str = "EXPIRED_CARD"
+        INVALID_CARD: str = "INVALID_CARD"
+        FRAUD: str = "FRAUD"
+        UNKNOWN: str = "UNKNOWN"
+
+def get_failure_category() -> "FailureCategory":
+            return random.choice(list(FailureCategory))
 
    

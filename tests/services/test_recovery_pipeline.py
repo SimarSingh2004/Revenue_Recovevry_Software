@@ -164,7 +164,7 @@ class RecoveryPipelineTests(unittest.TestCase):
 
         self.payment_provider.execute.assert_called_once_with("RETRY_PAYMENT", self.context, success_probability=0.60)
         self.assertEqual(self.db.add.call_count, 2)
-        self.assertEqual(self.db.commit.call_count, 2)
+        self.assertEqual(self.db.commit.call_count, 1)
 
         added_records = [
             call.args[0]

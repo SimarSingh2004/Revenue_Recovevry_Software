@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from app.db.session import get_db_session
+from app.models.recovery import PaymentHistory
 from app.schemas.payment import PaymentCreate
 from app.schemas.recovery_event import RecoveryEventCreate
 from app.services.llm_decision import LLMDecisionService, get_llm_decision_service
 from app.services.policy_engine import PolicyEngine
 from app.services.recovery_event import create_recovery_event_service
-from app.simulator.payments import PaymentOutcome, PaymentSimulator
+from app.simulator.payments import PaymentOutcome, PaymentSimulator, get_failure_category
 from app.simulator.payment_provider import PaymentProviderSimulator
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -45,6 +46,26 @@ def create_payment(
         outcome=payload.simulation_outcome,
     )
 
+    occurred_at=datetime.now(timezone.utc)
+
+    payment_history=PaymentHistory(
+        customer_id=payload.customer_id,
+         merchant_id=payload.merchant_id,
+        payment_id=payload.payment_id,
+        amount=payload.amount,
+        currency=payload.currency,
+        payment_method=payload.payment_method,
+        status=simulation_result.outcome.value,
+        event_type=(
+            "PAYMENT_COMPLETED"
+            if simulation_result.outcome == PaymentOutcome.SUCCESS
+            else "PAYMENT_FAILED"
+        ),
+        occurred_at=occurred_at,
+    )
+
+    db.add(payment_history)
+
     if simulation_result.outcome == PaymentOutcome.SUCCESS:
         return {
             "status": "success",
@@ -54,16 +75,14 @@ def create_payment(
     recovery_event = RecoveryEventCreate(
         event_id=f"recovery_event_{uuid4().hex}",
         event_type="PAYMENT_FAILED",
-        occurred_at=datetime.now(
-            timezone.utc
-        ),
+        occurred_at=occurred_at,
         payment_id=payload.payment_id,
         merchant_id=payload.merchant_id,
         customer_id=payload.customer_id,
         amount=payload.amount,
         currency=payload.currency,
         failure_code="SIMULATED_FAILURE",
-        failure_category="TEMPORARY_FAILURE",
+        failure_category=get_failure_category(),
         payment_method=payload.payment_method,
     )
 
