@@ -14,6 +14,7 @@ from app.services.llm_decision import (
 from app.services.policy_engine import PolicyEngine
 from app.simulator.payment_provider import PaymentProviderSimulator
 from app.services.recovery_event import create_recovery_event_service
+from app.services.recovery_dashboard import get_latest_recovery_dashboard
 
 router = APIRouter(prefix="/recovery-events", tags=["recovery-events"])
 
@@ -53,3 +54,9 @@ def create_recovery_event(
             response.status_code=status.HTTP_200_OK
 
         return result
+
+@router.get("/latest")
+def latest_recovery_dashboard(
+     db:Session=Depends(get_db_session)
+)-> dict:
+     return get_latest_recovery_dashboard(db=db)

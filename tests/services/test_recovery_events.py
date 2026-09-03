@@ -144,7 +144,7 @@ class RecoveryEventServiceTests(unittest.TestCase):
         self.assertEqual(self.session.events, {})
         self.assertEqual(self.session.cases, {})
 
-        self.assertEqual(context.exception.status_code, 500)
+        self.assertEqual(context.exception.status_code, 503)
 
 
 if __name__ == "__main__":

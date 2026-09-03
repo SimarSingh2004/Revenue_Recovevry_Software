@@ -40,6 +40,7 @@ class RecoveryEventIngestionResponse(BaseModel):
     status: str
     recovery_event: RecoveryEventResponse
     recovery_case: RecoveryCaseResponse
+    rationale: Optional[str] = None
 
 
 class ValidationErrorDetail(BaseModel):

@@ -50,7 +50,7 @@ def create_payment(
 
     payment_history=PaymentHistory(
         customer_id=payload.customer_id,
-         merchant_id=payload.merchant_id,
+        merchant_id=payload.merchant_id,
         payment_id=payload.payment_id,
         amount=payload.amount,
         currency=payload.currency,
@@ -70,6 +70,11 @@ def create_payment(
         return {
             "status": "success",
             "payment_id": simulation_result.payment_id,
+            "merchant_id": payload.merchant_id,
+            "customer_id": payload.customer_id,
+            "amount": payload.amount,
+            "currency": payload.currency,
+            "payment_method": payload.payment_method,
         }
 
     recovery_event = RecoveryEventCreate(

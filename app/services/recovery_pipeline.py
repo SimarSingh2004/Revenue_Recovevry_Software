@@ -32,6 +32,7 @@ def run_recovery_pipeline(
     llm_decision_service: LLMDecisionService,
     policy_engine: PolicyEngine | None = None,
     payment_provider: PaymentProviderSimulator | None = None,
+    decision_capture:dict |None = None
 ) -> tuple[PolicyDecision, SimulationResult | None]:
     context = load_recovery_context(db, recovery_case.case_id)
     now=datetime.now(timezone.utc)
@@ -54,6 +55,8 @@ def run_recovery_pipeline(
             decision: LLMDecision = llm_decision_service.decide(
                 context, historical_insights, policy_feedback=policy_feedback
             )
+            if decision_capture is not None:
+                decision_capture["rationale"] = decision.rationale
         except RuntimeError:
             db.rollback()
             raise 
@@ -129,6 +132,7 @@ def run_recovery_until_resolved(
         llm_decision_service:LLMDecisionService,
         policy_engine:PolicyEngine | None = None,
         payment_provider:PaymentProviderSimulator | None = None,
+        decision_capture:dict |None = None
 )-> tuple[PolicyDecision, SimulationResult | None]:
     while True:
         policy_decision, simulation_result = run_recovery_pipeline(
@@ -137,6 +141,7 @@ def run_recovery_until_resolved(
             llm_decision_service,
             policy_engine=policy_engine,
             payment_provider=payment_provider,
+            decision_capture=decision_capture
         )
 
         if simulation_result is None:

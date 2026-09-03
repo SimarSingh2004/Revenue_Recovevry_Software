@@ -53,22 +53,26 @@ def create_recovery_event_service(
         db.refresh(recovery_event)
         db.refresh(recovery_case)
 
+        decision_capture = {}
+
         run_recovery_until_resolved(
             db=db,
             recovery_case=recovery_case,
             llm_decision_service=llm_decision_service,
             policy_engine=policy_engine,
             payment_provider=payment_provider,
+            decision_capture=decision_capture
         )
-    except SQLAlchemyError as error:
+    except (SQLAlchemyError,RuntimeError) as error:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to create recovery event",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Unable to create recovery event: {error}",
         ) from error
 
     return RecoveryEventIngestionResponse(
         status="created",
         recovery_event=recovery_event,
         recovery_case=recovery_case,
+        rationale=decision_capture.get("rationale")
     )

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from random import Random, random
+import random
 
 class PaymentOutcome(str,Enum):
     SUCCESS = "SUCCESS"
