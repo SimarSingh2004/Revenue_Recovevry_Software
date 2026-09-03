@@ -1,138 +1,230 @@
 # Revenue Recovery Strategy Optimizer
 
-Minimal runtime foundation for the Razorpay AI Buildathon Revenue Recovery project.
+An AI-powered revenue recovery system that turns failed payments into recovered revenue — Gemini recommends a recovery action, deterministic economic and policy layers approve or reject it, a synthetic payment environment executes it, and the outcome feeds back into a learning memory that improves future decisions.
 
-## Prerequisites
+**AI recommends. Deterministic systems control execution.**
 
-- Python 3.11 or newer
-- Docker Desktop (or Docker Engine with the Compose plugin)
+## TL;DR
 
-## Local setup
+- Failed payment comes in → Gemini proposes a bounded recovery action (`RETRY_PAYMENT`, `ALTERNATE_PAYMENT_METHOD`, or `SEND_PAYMENT_LINK`) with a predicted recovery probability and rationale.
+- The proposal is checked against deterministic **economic** and **policy** rules before anything executes — Gemini never touches a payment directly.
+- An approved action runs against a synthetic payment simulator, the outcome is verified, and it's written into learning memory.
+- **Memory works**: giving Gemini three past recovery outcomes for a similar case changed its decision from `RETRY_PAYMENT` (0.80 predicted) to `SEND_PAYMENT_LINK` (0.85 predicted) — see [Evaluation](#evaluation).
+- Built with FastAPI + PostgreSQL on the backend, React + Vite on the frontend, Google Gemini for decisioning.
 
-From the repository root, create and activate a virtual environment:
+## Screenshots
 
-```powershell
+**Dashboard — recovery metrics and lifecycle at a glance**
+
+![Dashboard overview](docs/screenshots/dashboard.png)
+
+**Failed payment → AI decision — action, predicted probability, rationale**
+
+![Failed payment AI decision](docs/screenshots/ai-recovery-decision.png)
+
+**Policy + execution result — approved action and recovered value**
+
+![Policy and execution result](docs/screenshots/policy-execution.png)
+
+## Evaluation
+
+**Question:** does historical recovery memory actually change what Gemini decides?
+
+**Setup:** the same failed-payment context (a temporary UPI failure) was evaluated twice — once with no historical insights, once with three relevant past outcomes supplied.
+
+| Metric              | Memory OFF      | Memory ON           |
+| ------------------- | --------------- | ------------------- |
+| Action              | `RETRY_PAYMENT` | `SEND_PAYMENT_LINK` |
+| Predicted recovery  | 0.80            | 0.85                |
+| Historical insights | None            | 3                   |
+
+With memory on, Gemini explicitly reasoned from the supplied history:
+
+- `SEND_PAYMENT_LINK` → `SUCCESS` / `POSITIVE_RECOVERY`
+- `ALTERNATE_PAYMENT_METHOD` → `FAILED` / `FEE_LOSS`
+- `RETRY_PAYMENT` → `FAILED` / `FEE_LOSS`
+
+**Result:** the memory → decision feedback loop works as designed — supplying relevant history measurably changed both the chosen action and the model's confidence.
+
+_Note: the simulator is stochastic and synthetic, so this demonstrates the feedback mechanism rather than real-world recovery lift._
+
+## Quickstart
+
+### Backend
+
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-Install the project dependencies:
-
-```powershell
+.\.venv\Scripts\Activate.ps1        # Windows PowerShell
 python -m pip install -r requirements.txt
-```
-
-Copy the example environment file and adjust values if needed:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-## PostgreSQL
-
-Start the local PostgreSQL 16 container:
-
-```powershell
-docker compose up -d
-```
-
-Stop the container while preserving its named `postgres_data` volume:
-
-```powershell
-docker compose down
-```
-
-To remove the database data as well, run `docker compose down -v`.
-
-Initialize the database tables and verify the schema:
-
-```powershell
+docker compose up -d                # start PostgreSQL
 python -m scripts.verify_database
-```
-
-Current tables: `recovery_events`, `recovery_cases`, `payment_history`,
-`merchant_context`, and `merchant_history`.
-
-Create a recovery event and its initial case:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/recovery-events -ContentType "application/json" -Body '{"event_id":"event_001","event_type":"PAYMENT_FAILED","occurred_at":"2026-08-23T12:00:00Z","payment_id":"payment_001","merchant_id":"merchant_001","customer_id":"customer_001","amount":"125.50","currency":"INR","failure_code":"DECLINED","failure_category":"TEMPORARY_FAILURE","payment_method":"CARD","attempt_number":1}'
-```
-
-## Run the application
-
-```powershell
 python -m uvicorn app.main:app --reload
 ```
 
-The service listens on `http://127.0.0.1:8000` by default. Verify it with:
+Backend runs at `http://127.0.0.1:8000`.
 
-```powershell
-Invoke-WebRequest http://127.0.0.1:8000/health | Select-Object -ExpandProperty Content
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-## Current configuration
+### Configuration
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `APP_NAME` | `Revenue Recovery Strategy Optimizer` | Application name returned by the health check. |
-| `APP_ENVIRONMENT` | `development` | Runtime environment label returned by the health check. |
-| `DATABASE_HOST` | `127.0.0.1` | PostgreSQL host exposed by Docker Compose. |
-| `DATABASE_PORT` | `5432` | PostgreSQL host port exposed by Docker Compose. |
-| `DATABASE_NAME` | `revenue_recovery` | Local PostgreSQL database name. |
-| `DATABASE_USER` | `revenue_recovery` | Local PostgreSQL user. |
-| `DATABASE_PASSWORD` | `local_development_password` | Local PostgreSQL password. |
+Copy `.env.example` to `.env` and set:
 
-Configuration is read from process environment variables and, when present, a local `.env` file. `.env` is intentionally not committed.
+```env
+APP_NAME=Revenue Recovery Strategy Optimizer
+APP_ENVIRONMENT=development
 
-PostgreSQL currently provides the database foundation and the five persisted
-observable-data tables. No application behavior has been added.
+DATABASE_HOST=127.0.0.1
+DATABASE_PORT=5432
+DATABASE_NAME=revenue_recovery
+DATABASE_USER=revenue_recovery
+DATABASE_PASSWORD=local_development_password
 
-## Recovery action vocabulary
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash
+```
 
-The initial failed-payment slice has a fixed, application-level vocabulary of
-recovery interventions. Each action has a canonical intervention cost, which
-callers cannot override through the action definition:
+`VITE_API_BASE_URL` (frontend, optional) defaults to the local backend URL if unset.
 
-| Action | Cost | Basic semantics |
-| --- | ---: | --- |
-| `RETRY_PAYMENT` | 2 | Re-attempt the current failed payment with the same payment method. A future actual payment attempt increments the payment attempt number. |
-| `ALTERNATE_PAYMENT_METHOD` | 3 | Attempt the same outstanding payment with a different available method. A future actual payment attempt increments the payment attempt number. |
-| `SEND_PAYMENT_LINK` | 1 | Generate or send a recovery payment link. Sending it does not increment the attempt number; a later customer payment attempt via the link does. |
-| `ESCALATE` | 5 | Move the same recovery case to a higher-touch/manual path; it is not a payment attempt. |
-| `STOP` | 0 | Deliberately take no recovery intervention for the current case. |
+### Tests
 
-The vocabulary defines only the available interventions, their costs, and their
-payment-attempt semantics. Later AI, optimizer, and deterministic policy
-components will consume these definitions to predict, select, authorize, and
-execute actions. They—not the vocabulary—will determine eligibility, expected
-recovery, or workflow execution.
+```bash
+python -m pytest              # backend
+npm run lint                  # frontend lint (from /frontend)
+npm run build                 # frontend production build (from /frontend)
+```
 
-## Provider/payment simulator
+## How It Works
 
-The provider/payment simulator represents the external environment after an
-action is selected. It returns a structured simulated outcome, samples success
-or failure from a caller-supplied probability, and accepts a seedable random
-source for reproducible tests and demonstrations. It records whether an action
-is a provider execution and whether it is an actual customer payment attempt;
-sending a payment link is not itself a payment attempt.
+```text
+Failed Payment
+      |
+      v
+Recovery Context  ───────────────►  Gemini Decision
+                                          |
+                                          +-- Action
+                                          +-- Predicted Recovery Probability
+                                          +-- Rationale
+                                          |
+                                          v
+                                  Economic Evaluation  ← expected value vs. transaction value
+                                          |
+                                          v
+                                  Policy Evaluation     ← business rules, can reject any AI call
+                                          |
+                                          v
+                                  Synthetic Execution   ← SUCCESS / FAILED
+                                          |
+                                          v
+                                  Outcome Verification
+                                          |
+                                          v
+                          Learning Memory  +  Recovery Metrics
+```
 
-Ground-truth probability generation remains a separate future evaluation and
-environment concern. The simulator does not choose actions or define a
-probability table.
+Gemini receives a bounded `RecoveryContext`, the recovery actions allowed for that case, and optionally relevant historical recovery insights. It returns exactly:
 
-## Payment attempts and hidden ground truth
+```json
+{
+  "action": "ALTERNATE_PAYMENT_METHOD",
+  "predicted_p_recovery": 0.6,
+  "rationale": "The failure context indicates that an alternate payment method is a suitable recovery path."
+}
+```
 
-`RETRY_PAYMENT`, `ALTERNATE_PAYMENT_METHOD`, and `SEND_PAYMENT_LINK` increment
-the current payment attempt number; `ESCALATE` and `STOP` do not. The hidden
-environment ground-truth function calculates provider-payment success
-probabilities only for the three payment actions, using customer success
-history, payment method, failure category, time since failure, and previous
-recovery attempts, then clamps the result from 0.05 to 0.95.
+That recommendation then passes through economic and policy checks — both of which can reject it — before anything reaches the synthetic execution layer.
 
-This probability is an environment input to the simulator and is not a
-model-visible feature. `ESCALATE` and `STOP` have no provider payment success
-probability.
+### Recovery actions
 
-This stage does not include AI, optimization, policy, reconciliation, audit, or
-evaluation behavior.
+| Action                     | Purpose                                                          |
+| -------------------------- | ---------------------------------------------------------------- |
+| `RETRY_PAYMENT`            | Retry the failed payment using the existing payment method       |
+| `ALTERNATE_PAYMENT_METHOD` | Attempt recovery through an alternative payment method           |
+| `SEND_PAYMENT_LINK`        | Payment-link style recovery attempt in the synthetic environment |
+
+### Economic evaluation
+
+Uses Gemini's predicted recovery probability together with transaction value and recovery economics to check the proposed action has sufficient expected value. Gemini proposes one candidate action; this layer evaluates it — it doesn't search the full action space itself.
+
+### Policy evaluation
+
+Applies deterministic business constraints on top of the economic check. A Gemini recommendation can be rejected here even when the economics look favorable.
+
+### Learning memory
+
+Every completed recovery attempt is stored with its action, predicted probability, ground-truth outcome, baseline probability, payment characteristics, failure category, financial impact, and attempt number — building the experience layer that the [evaluation above](#evaluation) draws on.
+
+## Recovery Metrics
+
+The dashboard tracks:
+
+- Recovery success rate = successful recoveries / total recovery attempts
+- Net recovered value = total recovered value − total fee loss
+- LLM probability error = mean(abs(predicted − ground truth)), a calibration-style metric
+- Baseline probability error, for comparison against the LLM
+- Total recovery attempts, successful recoveries, total recovered value, total fee loss
+
+## Project Structure
+
+```text
+Revenue_Recovevry_Software/
+|
++-- app/
+|   +-- api/            payments.py, recovery_events.py
+|   +-- core/           config.py, database.py
+|   +-- models/
+|   +-- schemas/
+|   +-- services/       recovery_context.py, recovery_decision.py,
+|   |                   recovery_economics.py, recovery_event.py,
+|   |                   recovery_memory.py, recovery_metrics.py,
+|   |                   recovery_pipeline.py
+|   +-- simulator/      payments.py
+|   +-- main.py
+|
++-- frontend/
+|   +-- src/App.jsx
+|   +-- package.json
+|   +-- vite.config.js
+|
++-- docs/
+|   +-- screenshots/    dashboard.png, ai-decision.png, policy-execution.png
+|
++-- scripts/            verify_database.py
++-- tests/
++-- docker-compose.yml
++-- requirements.txt
++-- .env.example
+```
+
+## Tech Stack
+
+| Layer          | Stack                                                      |
+| -------------- | ---------------------------------------------------------- |
+| Backend        | Python, FastAPI, SQLAlchemy, PostgreSQL, Pydantic, Psycopg |
+| AI             | Google Gemini (`google-genai`)                             |
+| Frontend       | React, Vite, JavaScript, ESLint                            |
+| Infrastructure | Docker Compose, PostgreSQL                                 |
+| Testing        | Pytest, ESLint, Vite production build                      |
+
+## Design Principles
+
+- **AI recommends, systems decide.** Gemini never executes a payment or overrides policy — every recommendation passes through economic and policy gates first.
+- **Bounded action space.** Gemini can only choose from the recovery actions the application permits for a given context.
+- **Synthetic, not live.** The payment execution layer is a simulator, kept deliberately separate from real payment infrastructure.
+- **Measurable by design.** Every recovery attempt is verified and logged, so predicted probability can be checked against ground truth and compared to a baseline.
+
+## Demo Flow
+
+1. Create a payment (₹1,000, CARD, outcome `SUCCESS`) — it succeeds and never enters recovery.
+2. Create another (₹1,000, CARD, outcome `FAILED`) — it enters the recovery pipeline.
+3. Gemini returns an action, predicted recovery probability, and rationale.
+4. The action is checked against economic and policy rules; the dashboard shows the result.
+5. An approved action runs through the synthetic simulator and returns `SUCCESS` or `FAILED`.
+6. The outcome updates recovered value, fee loss, net recovered value, success rate, and learning memory.
+
+This is a deliberately scoped vertical slice — failed payments as the initial recovery domain — built to show the full loop from AI recommendation to economic control, policy control, safe execution, verification, and measurable financial outcome.

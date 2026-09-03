@@ -190,8 +190,8 @@ main {
   margin-top: 14px;
   margin-bottom: 22px;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
 }
 
 .metric-item {
@@ -203,6 +203,7 @@ main {
   justify-content: space-between;
   align-items: center;
   gap: 15px;
+  grid-column: span 2;
 }
 
 .metric-item span {
@@ -213,6 +214,10 @@ main {
 .metric-item strong {
   color: #111827;
   font-size: 15px;
+}
+.metric-item:nth-child(4),
+.metric-item:nth-child(5) {
+  grid-column: span 3;
 }
 
 /* ---------------- DEMO CONTROLS ---------------- */
@@ -869,5 +874,13 @@ main {
 
   .simulate-button {
     width: auto;
+  }
+
+  .secondary-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-item {
+    grid-column: span 1;
   }
 }

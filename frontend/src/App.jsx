@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_BASE = import.meta.env.VIBE_API_BASE_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 function App() {
   const [metrics, setMetrics] = useState(null);
@@ -242,6 +242,20 @@ function App() {
           <div className="metric-item">
             <span>Successful Recoveries</span>
             <strong>{metrics ? metrics.successful_recoveries : "—"}</strong>
+          </div>
+
+          <div className="metric-item">
+            <span>LLM Probability Error</span>
+            <strong>
+              {metrics ? formatProbability(metrics.llm_error) : "—"}
+            </strong>
+          </div>
+
+          <div className="metric-item">
+            <span>Baseline Probability Error</span>
+            <strong>
+              {metrics ? formatProbability(metrics.baseline_error) : "—"}
+            </strong>
           </div>
         </section>
 
