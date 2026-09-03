@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VIBE_API_BASE_URL || "http://localhost:8000";
 
 function App() {
   const [metrics, setMetrics] = useState(null);
@@ -18,7 +18,7 @@ function App() {
     customer_id: "",
     amount: "",
     currency: "INR",
-    payment_method: "card",
+    payment_method: "CARD",
     simulation_outcome: "FAILED",
   });
 
@@ -78,6 +78,8 @@ function App() {
       const payload = {
         ...demoForm,
         amount: Number(demoForm.amount),
+        payment_method: demoForm.payment_method.toUpperCase(),
+        currency: demoForm.currency.toUpperCase(),
       };
 
       const response = await fetch(`${API_BASE}/payments`, {
@@ -337,13 +339,17 @@ function App() {
 
                 <label>
                   Payment Method
-                  <input
+                  <select
                     name="payment_method"
                     value={demoForm.payment_method}
                     onChange={handleDemoFieldChange}
-                    placeholder="card"
                     required
-                  />
+                  >
+                    <option value="CARD">CARD</option>
+                    <option value="UPI">UPI</option>
+                    <option value="NETBANKING">NETBANKING</option>
+                    <option value="WALLET">WALLET</option>
+                  </select>
                 </label>
 
                 <label>

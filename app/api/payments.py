@@ -41,6 +41,9 @@ def create_payment(
         get_payment_provider
     ),
 ):
+    payment_method = payload.payment_method.upper()
+    currency = payload.currency.upper()
+
     simulation_result = payment_simulator.process(
         payload.payment_id,
         outcome=payload.simulation_outcome,
@@ -53,8 +56,8 @@ def create_payment(
         merchant_id=payload.merchant_id,
         payment_id=payload.payment_id,
         amount=payload.amount,
-        currency=payload.currency,
-        payment_method=payload.payment_method,
+        currency=currency,
+        payment_method=payment_method,
         status=simulation_result.outcome.value,
         event_type=(
             "PAYMENT_COMPLETED"
@@ -67,14 +70,15 @@ def create_payment(
     db.add(payment_history)
 
     if simulation_result.outcome == PaymentOutcome.SUCCESS:
+        db.commit()
         return {
             "status": "success",
             "payment_id": simulation_result.payment_id,
             "merchant_id": payload.merchant_id,
             "customer_id": payload.customer_id,
             "amount": payload.amount,
-            "currency": payload.currency,
-            "payment_method": payload.payment_method,
+            "currency": currency,
+            "payment_method":payment_method,
         }
 
     recovery_event = RecoveryEventCreate(
@@ -85,10 +89,10 @@ def create_payment(
         merchant_id=payload.merchant_id,
         customer_id=payload.customer_id,
         amount=payload.amount,
-        currency=payload.currency,
+        currency=currency,
         failure_code="SIMULATED_FAILURE",
         failure_category=get_failure_category(),
-        payment_method=payload.payment_method,
+        payment_method=payment_method,
     )
 
     recovery_result = create_recovery_event_service(
