@@ -91,7 +91,7 @@ def create_payment(
         amount=payload.amount,
         currency=currency,
         failure_code="SIMULATED_FAILURE",
-        failure_category=get_failure_category(),
+        failure_category=get_failure_category(payment_method),
         payment_method=payment_method,
     )
 

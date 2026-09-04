@@ -91,7 +91,10 @@ class PolicyEngine:
                 reasons=[f"Action '{action}' was already attempted."],
             )
 
-        if expected_net_recovery <= 0:
+        if(
+             resolved_action not in {RecoveryAction.ESCALATE, RecoveryAction.STOP}
+             and expected_net_recovery <= 0
+        ):
             return PolicyDecision(
                 approved=False,
                 action=action,

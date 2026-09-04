@@ -68,7 +68,7 @@ class LLMDecisionService:
                         contents=json.dumps(payload,indent=2),
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
-                            temperature=0.0,
+                            temperature=1.0,
                             response_mime_type="application/json",
                             response_schema={
                                 "type": "OBJECT",
@@ -86,7 +86,10 @@ class LLMDecisionService:
                                     "predicted_p_recovery",
                                     "rationale",
                                 ],
-                            }
+                            },
+                            thinking_config=types.ThinkingConfig(
+                                thinking_level="low",
+                            )
                         )
                     )
         except Exception as exe:

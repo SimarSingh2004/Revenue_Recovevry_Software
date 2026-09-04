@@ -142,7 +142,7 @@ class RecoveryLearningMemory(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "financial_impact IN ('POSITIVE_RECOVERY', 'FEE_LOSS')",
+            "financial_impact IN ('POSITIVE_RECOVERY', 'FEE_LOSS', 'NO_RECOVERY_ATTEMPT')",
             name="ck_recovery_learning_memory_financial_impact",
         ),
         Index(

@@ -34,7 +34,13 @@ class FailureCategory(str,Enum):
         FRAUD: str = "FRAUD"
         UNKNOWN: str = "UNKNOWN"
 
-def get_failure_category() -> "FailureCategory":
+def get_failure_category(payment_method: str) -> "FailureCategory":
+            if payment_method!="CARD":
+                eligible=[
+                        c for c in FailureCategory
+                         if c not in (FailureCategory.EXPIRED_CARD, FailureCategory.INVALID_CARD) 
+                        ]
+                return random.choice(eligible)
             return random.choice(list(FailureCategory))
 
    

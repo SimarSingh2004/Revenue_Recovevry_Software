@@ -173,8 +173,8 @@ function App() {
     <div className="app">
       <header className="header">
         <div>
-          <h1>Revenue Recovery</h1>
-          <p>AI-powered recovery strategy optimizer</p>
+          <h1>Recoup</h1>
+          <p>AI-recommended, policy-controlled payment recovery</p>
         </div>
 
         <div className="header-actions">
