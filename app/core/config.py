@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     database_user: str
     database_password: str
     gemini_api_key: str
-    gemini_model: str ="gemini-3.7-flash"
+    gemini_model: str ="gemini-3.1-flash-lite"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
