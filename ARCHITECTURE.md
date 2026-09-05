@@ -40,22 +40,22 @@ Both call `create_recovery_event_service` (`app/services/recovery_event.py`), wh
 
 ## Module Map
 
-| File | Responsibility |
-| --- | --- |
-| `services/recovery_event.py` | Entry point — idempotent event ingestion, kicks off the pipeline |
-| `services/recovery_pipeline.py` | Orchestrates one decision cycle and the outer resolve-until-terminal loop |
-| `services/recovery_context.py` | Assembles the bounded `RecoveryContext` Gemini sees, from DB rows |
-| `services/llm_decision.py` | Calls Gemini with a fixed system prompt, JSON schema, and `temperature=0.0`; validates the returned action is in the allowed set |
-| `services/optimizer.py` | Pure function: `predicted_p × amount − action_cost − risk_penalty` |
-| `services/policy_engine.py` | The 6 deterministic approval checks; the only place an action is actually authorized |
-| `services/recovery_memory.py` | Retrieves diverse historical examples for Gemini; writes the outcome of every attempt afterward |
-| `services/recovery_metrics.py` | Aggregates `RecoveryLearningMemory` into the live `/metrics/recovery` numbers |
-| `services/recovery_dashboard.py` | Read model for the frontend — the most recent case's full decision/policy/execution/outcome view |
-| `simulator/payment_provider.py` | Executes an approved action; returns `SUCCESS`/`FAILED`/`NOT_EXECUTED` (the latter for `STOP`/`ESCALATE`) |
-| `simulator/ground_truth.py` | Hidden probability model used to decide the *actual* simulated outcome (Gemini never sees this) |
-| `simulator/baseline.py` | A separate, simpler probability heuristic — stored alongside Gemini's prediction purely for calibration comparison |
-| `core/recovery_actions.py` | The `RecoveryAction` enum plus each action's cost and risk penalty |
-| `core/config.py` | Environment-driven settings (DB, Gemini key/model) via `pydantic-settings` |
+| File                             | Responsibility                                                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `services/recovery_event.py`     | Entry point — idempotent event ingestion, kicks off the pipeline                                                                 |
+| `services/recovery_pipeline.py`  | Orchestrates one decision cycle and the outer resolve-until-terminal loop                                                        |
+| `services/recovery_context.py`   | Assembles the bounded `RecoveryContext` Gemini sees, from DB rows                                                                |
+| `services/llm_decision.py`       | Calls Gemini with a fixed system prompt, JSON schema, and `temperature=1.0`; validates the returned action is in the allowed set |
+| `services/optimizer.py`          | Pure function: `predicted_p × amount − action_cost − risk_penalty`                                                               |
+| `services/policy_engine.py`      | The 6 deterministic approval checks; the only place an action is actually authorized                                             |
+| `services/recovery_memory.py`    | Retrieves diverse historical examples for Gemini; writes the outcome of every attempt afterward                                  |
+| `services/recovery_metrics.py`   | Aggregates `RecoveryLearningMemory` into the live `/metrics/recovery` numbers                                                    |
+| `services/recovery_dashboard.py` | Read model for the frontend — the most recent case's full decision/policy/execution/outcome view                                 |
+| `simulator/payment_provider.py`  | Executes an approved action; returns `SUCCESS`/`FAILED`/`NOT_EXECUTED` (the latter for `STOP`/`ESCALATE`)                        |
+| `simulator/ground_truth.py`      | Hidden probability model used to decide the _actual_ simulated outcome (Gemini never sees this)                                  |
+| `simulator/baseline.py`          | A separate, simpler probability heuristic — stored alongside Gemini's prediction purely for calibration comparison               |
+| `core/recovery_actions.py`       | The `RecoveryAction` enum plus each action's cost and risk penalty                                                               |
+| `core/config.py`                 | Environment-driven settings (DB, Gemini key/model) via `pydantic-settings`                                                       |
 
 ## Data Model
 
@@ -97,17 +97,17 @@ Two separate anti-repetition mechanisms operate at different scopes:
 - **Within one decision cycle**: `rejected_actions` is an in-memory set — if Gemini proposes an action already rejected earlier in this cycle, that's flagged in `policy_feedback` before re-evaluating.
 - **Across cycles, in the policy engine itself**: check #5 rejects an action if it exactly matches `last_recovery_action` from `MerchantHistory` — i.e., you can't execute the same action twice in a row for a case, even across separate pipeline runs.
 
-If all 3 attempts in a cycle are rejected, `run_recovery_pipeline` returns `(policy_decision, None)` with nothing executed. `run_recovery_until_resolved` treats a `None` simulation result as "nothing left to do this call" — the case is only moved to a terminal `STOPPED`/`ESCALATED` state when Gemini's *approved* action is `STOP` or `ESCALATE`, not merely when retries are exhausted. In practice, since `ESCALATE`/`STOP` bypass the attempt-limit check, an exhausted case reliably converges to one of those on a subsequent cycle.
+If all 3 attempts in a cycle are rejected, `run_recovery_pipeline` returns `(policy_decision, None)` with nothing executed. `run_recovery_until_resolved` treats a `None` simulation result as "nothing left to do this call" — the case is only moved to a terminal `STOPPED`/`ESCALATED` state when Gemini's _approved_ action is `STOP` or `ESCALATE`, not merely when retries are exhausted. In practice, since `ESCALATE`/`STOP` bypass the attempt-limit check, an exhausted case reliably converges to one of those on a subsequent cycle.
 
 ## Three Probabilities, Not One
 
 The system deliberately keeps three probability values separate, so prediction quality is measurable rather than assumed:
 
-| Probability | Computed by | Purpose |
-| --- | --- | --- |
-| `predicted_p_recovery` | Gemini | What the model believes; used in the economic calculation and policy gate |
-| `gt_p` (ground truth) | `simulator/ground_truth.py` — a deterministic formula over action, payment method, failure category, customer history, time-since-failure, and attempt count | Secretly decides the simulator's actual `SUCCESS`/`FAILED` roll — Gemini never sees this |
-| `baseline_p` | `simulator/baseline.py` — a simpler heuristic (no failure-category or payment-method effects) | Stored for comparison only, to compute `baseline_error` alongside `llm_error` in `/metrics/recovery` |
+| Probability            | Computed by                                                                                                                                                  | Purpose                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `predicted_p_recovery` | Gemini                                                                                                                                                       | What the model believes; used in the economic calculation and policy gate                            |
+| `gt_p` (ground truth)  | `simulator/ground_truth.py` — a deterministic formula over action, payment method, failure category, customer history, time-since-failure, and attempt count | Secretly decides the simulator's actual `SUCCESS`/`FAILED` roll — Gemini never sees this             |
+| `baseline_p`           | `simulator/baseline.py` — a simpler heuristic (no failure-category or payment-method effects)                                                                | Stored for comparison only, to compute `baseline_error` alongside `llm_error` in `/metrics/recovery` |
 
 ## Recovery Memory Retrieval
 
@@ -115,13 +115,13 @@ The system deliberately keeps three probability values separate, so prediction q
 
 ## API Surface
 
-| Endpoint | Purpose |
-| --- | --- |
-| `POST /payments` | Create a payment; on failure, runs it through the full recovery pipeline |
-| `POST /recovery-events` | Ingest a recovery event directly (idempotent on `event_id`) |
+| Endpoint                      | Purpose                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `POST /payments`              | Create a payment; on failure, runs it through the full recovery pipeline                  |
+| `POST /recovery-events`       | Ingest a recovery event directly (idempotent on `event_id`)                               |
 | `GET /recovery-events/latest` | Full decision/policy/execution/outcome view of the most recent case — backs the dashboard |
-| `GET /metrics/recovery` | Live aggregate metrics across every resolved case |
-| `GET /health` | Liveness check |
+| `GET /metrics/recovery`       | Live aggregate metrics across every resolved case                                         |
+| `GET /health`                 | Liveness check                                                                            |
 
 ## Configuration
 
